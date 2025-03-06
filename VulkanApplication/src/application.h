@@ -7,6 +7,11 @@
 
 #include <vulkan/vulkan.h>
 
+#include "VkExtensions.h"
+#include "VkLayers.h"
+
+#define ENABLE_VALIDATION_LAYERS
+
 namespace nex {
 
 class Application {
@@ -22,12 +27,12 @@ private:
     void initVulkan();
 
     void createVulkanInstance();
+    void createVulkanDebugMessenger();
 
     void cleanup();
+    void destroyVulkanDebugMessenger();
 
     void loop();
-
-    bool checkExtensionsAvailable(uint32_t extensionCount, const char** extensions);
 
 private:
     bool m_init = false;
@@ -36,9 +41,27 @@ private:
     int m_width = 0;
     int m_height = 0;
 
+    std::vector<const char*> m_requiredInstanceExtensions {
+        #ifdef ENABLE_VALIDATION_LAYERS
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+        #endif
+    };
+
+    std::vector<const char*> m_requiredInstanceLayers {
+        #ifdef ENABLE_VALIDATION_LAYERS
+        "VK_LAYER_KHRONOS_validation"
+        #endif
+    };
+
+    // GLFW
     GLFWwindow* m_window = nullptr;
 
+    // Vulkan
     VkInstance m_vkInstance;
+    VkDebugUtilsMessengerEXT m_vkDebugMessengerInstance;
+
+    VkExtensions m_instanceExtensions = VkExtensions::InstanceExtensions();
+    VkLayers m_instanceLayers = VkLayers::InstanceLayers();
 };
 
 } // namespace nex
