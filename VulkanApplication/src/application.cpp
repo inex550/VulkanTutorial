@@ -35,7 +35,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vulkanDebugCallback(
     CHECK_TYPE(PERFORMANCE);
     #undef CHECK_TYPE
 
-    std::cerr << " -- " << pCallbackData->pMessage;
+    std::cerr << " -- " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
 }
@@ -68,15 +68,15 @@ void Application::init() {
 }
 
 void Application::initWindow() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
     glfwSetErrorCallback([](int code, const char* description) {
         std::cerr << "GLFW error (" << code << "): " << description << std::endl;
     });
 
+    glfwInit();
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    
     m_window = glfwCreateWindow(m_width, m_height, m_title.data(), nullptr, nullptr);
 
     // Get required for window vulkan instance extensions
@@ -94,6 +94,8 @@ void Application::initWindow() {
 void Application::initVulkan() {
     createVulkanInstance();
     createVulkanDebugMessenger();
+    pickVulkanPhysicalDevice();
+    createVulkanLogicalDevice();
 }
 
 void Application::createVulkanInstance() {
@@ -147,8 +149,49 @@ void Application::createVulkanDebugMessenger() {
         std::cerr << "Function \"vkCreateDebugUtilsMessengerEXT\" can't be loaded" << std::endl;
     }
 
-    if (VkResult result = createDebugMessengerFunc(m_vkInstance, &createInfo, nullptr, &m_vkDebugMessengerInstance); result != VK_SUCCESS) {
+    if (VkResult result = createDebugMessengerFunc(m_vkInstance, &createInfo, nullptr, &m_vkDebugMessenger); result != VK_SUCCESS) {
         std::cerr << "createDebugUtilsMessenger func failed with code " << result << std::endl;
+    }
+}
+
+void Application::pickVulkanPhysicalDevice() {
+    VkDevices physicalDevices(m_vkInstance);
+    m_pickedVkPhysicalDevice = VkDevicePicker::PickDevice(physicalDevices);
+
+    if (m_pickedVkPhysicalDevice == VK_NULL_HANDLE) {
+        throw std::runtime_error("Failed to find any suitable physical device");
+    }
+}
+
+void Application::createVulkanLogicalDevice() {
+    QueueFamilyIndices deviceQueueFamilyIndices = VkDevicePicker::FindQueueFamilies(m_pickedVkPhysicalDevice);
+
+    if (!deviceQueueFamilyIndices.isComplete()) {
+        throw std::runtime_error("Failed to find necessary queue family");
+    }
+
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo {};
+    deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    deviceQueueCreateInfo.queueFamilyIndex = deviceQueueFamilyIndices.graphicsFamily.value();
+    deviceQueueCreateInfo.queueCount = 1;
+    
+    float queuePriority = 1.0;
+    deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
+
+    VkPhysicalDeviceFeatures deviceFeatures {};
+
+    VkDeviceCreateInfo deviceCreateInfo {};
+    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount = 1;
+    
+    deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+
+    deviceCreateInfo.ppEnabledLayerNames = m_requiredInstanceLayers.data();
+    deviceCreateInfo.enabledLayerCount = m_requiredInstanceLayers.size();
+
+    if (VkResult result = vkCreateDevice(m_pickedVkPhysicalDevice, &deviceCreateInfo, nullptr, &m_vkDevice); result != VK_SUCCESS) {
+        std::cerr << "Failed to create logical device; code: " << result << std::endl;
     }
 }
 
@@ -157,6 +200,7 @@ void Application::cleanup() {
         return;
     }
 
+    vkDestroyDevice(m_vkDevice, nullptr);
     destroyVulkanDebugMessenger();
     vkDestroyInstance(m_vkInstance, nullptr);
 
@@ -170,7 +214,7 @@ void Application::destroyVulkanDebugMessenger() {
         vkGetInstanceProcAddr(m_vkInstance, "vkDestroyDebugUtilsMessengerEXT")
     );
     if (destroyDebugMessengerFunc) {
-        destroyDebugMessengerFunc(m_vkInstance, m_vkDebugMessengerInstance, nullptr);
+        destroyDebugMessengerFunc(m_vkInstance, m_vkDebugMessenger, nullptr);
     }
 }
 

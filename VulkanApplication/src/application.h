@@ -9,6 +9,7 @@
 
 #include "VkExtensions.h"
 #include "VkLayers.h"
+#include "VkDevicePicker.h"
 
 #define ENABLE_VALIDATION_LAYERS
 
@@ -28,6 +29,8 @@ private:
 
     void createVulkanInstance();
     void createVulkanDebugMessenger();
+    void pickVulkanPhysicalDevice();
+    void createVulkanLogicalDevice();
 
     void cleanup();
     void destroyVulkanDebugMessenger();
@@ -58,7 +61,9 @@ private:
 
     // Vulkan
     VkInstance m_vkInstance;
-    VkDebugUtilsMessengerEXT m_vkDebugMessengerInstance;
+    VkDebugUtilsMessengerEXT m_vkDebugMessenger;
+    VkPhysicalDevice m_pickedVkPhysicalDevice;
+    VkDevice m_vkDevice;
 
     VkExtensions m_instanceExtensions = VkExtensions::InstanceExtensions();
     VkLayers m_instanceLayers = VkLayers::InstanceLayers();
