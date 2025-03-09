@@ -1,9 +1,17 @@
+#define VK_USE_PLATFORM_WAYLAND_KHR
+#include <vulkan/vulkan.h>
+
 #include "application.h"
 
 #include <iostream>
 #include <stdexcept>
 #include <vector>
-#include <cstring>
+#include <set>
+
+#include "VkDevices.h"
+
+#define GLFW_EXPOSE_NATIVE_WAYLAND
+#include <GLFW/glfw3native.h>
 
 namespace nex {
 
@@ -48,9 +56,7 @@ Application::Application(std::string_view title, int width, int height)
 }
 
 Application::~Application() {
-    if (m_init) {
-        cleanup();
-    }
+    cleanup();
 }
 
 void Application::run() {
@@ -94,6 +100,7 @@ void Application::initWindow() {
 void Application::initVulkan() {
     createVulkanInstance();
     createVulkanDebugMessenger();
+    createVulkanSurface();
     pickVulkanPhysicalDevice();
     createVulkanLogicalDevice();
 }
@@ -154,8 +161,19 @@ void Application::createVulkanDebugMessenger() {
     }
 }
 
+void Application::createVulkanSurface() {
+    VkWaylandSurfaceCreateInfoKHR createSurfaceInfo {};
+    createSurfaceInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+    createSurfaceInfo.surface = glfwGetWaylandWindow(m_window);
+    createSurfaceInfo.display = glfwGetWaylandDisplay();
+
+    if (VkResult result = vkCreateWaylandSurfaceKHR(m_vkInstance, &createSurfaceInfo, nullptr, &m_vkSurface); result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create vulkan wayland surface");
+    }
+}
+
 void Application::pickVulkanPhysicalDevice() {
-    VkDevices physicalDevices(m_vkInstance);
+    std::vector<VkPhysicalDevice> physicalDevices = VkDeviceUtils::PhysicalDevices(m_vkInstance);
     m_pickedVkPhysicalDevice = VkDevicePicker::PickDevice(physicalDevices);
 
     if (m_pickedVkPhysicalDevice == VK_NULL_HANDLE) {
@@ -164,35 +182,47 @@ void Application::pickVulkanPhysicalDevice() {
 }
 
 void Application::createVulkanLogicalDevice() {
-    QueueFamilyIndices deviceQueueFamilyIndices = VkDevicePicker::FindQueueFamilies(m_pickedVkPhysicalDevice);
+    QueueFamilyIndices deviceQueueFamilyIndices = VkDeviceUtils::FindQueueFamilies(m_pickedVkPhysicalDevice, m_vkSurface);
 
     if (!deviceQueueFamilyIndices.isComplete()) {
         throw std::runtime_error("Failed to find necessary queue family");
     }
 
-    VkDeviceQueueCreateInfo deviceQueueCreateInfo {};
-    deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    deviceQueueCreateInfo.queueFamilyIndex = deviceQueueFamilyIndices.graphicsFamily.value();
-    deviceQueueCreateInfo.queueCount = 1;
-    
-    float queuePriority = 1.0;
-    deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+    std::set<uint32_t> uniqueQueueFamilyIndices { 
+        deviceQueueFamilyIndices.graphicsFamily, deviceQueueFamilyIndices.presentFamily };
+
+    for (uint32_t queueFamilyIdx : uniqueQueueFamilyIndices) {
+        VkDeviceQueueCreateInfo queueCreateInfo {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = deviceQueueFamilyIndices.graphicsFamily.value();
+        queueCreateInfo.queueCount = 1;
+        
+        float queuePriority = 1.0;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
 
     VkPhysicalDeviceFeatures deviceFeatures {};
 
     VkDeviceCreateInfo deviceCreateInfo {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
-    deviceCreateInfo.queueCreateInfoCount = 1;
-    
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
+
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
     deviceCreateInfo.ppEnabledLayerNames = m_requiredInstanceLayers.data();
     deviceCreateInfo.enabledLayerCount = m_requiredInstanceLayers.size();
 
     if (VkResult result = vkCreateDevice(m_pickedVkPhysicalDevice, &deviceCreateInfo, nullptr, &m_vkDevice); result != VK_SUCCESS) {
-        std::cerr << "Failed to create logical device; code: " << result << std::endl;
+        throw std::runtime_error("Failed to create logical device");
     }
+
+    vkGetDeviceQueue(m_vkDevice, deviceQueueFamilyIndices.graphicsFamily.value(), 0, &m_vkGraphicsQueue);
+    vkGetDeviceQueue(m_vkDevice, deviceQueueFamilyIndices.presentFamily.value(), 0, &m_vkPresentQueue);
 }
 
 void Application::cleanup() {
@@ -201,6 +231,7 @@ void Application::cleanup() {
     }
 
     vkDestroyDevice(m_vkDevice, nullptr);
+    vkDestroySurfaceKHR(m_vkInstance, m_vkSurface, nullptr);    
     destroyVulkanDebugMessenger();
     vkDestroyInstance(m_vkInstance, nullptr);
 

@@ -4,20 +4,35 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <optional>
 
 namespace nex {
 
-class VkDevices {
-public:
-    VkDevices(VkInstance vkInstance);
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
 
-public:
-    const std::vector<VkPhysicalDevice>& devices() const {
-        return m_devices;
+    bool isComplete() {
+        return graphicsFamily.has_value() && presentFamily.has_value();
     }
+};
 
-private:
-    std::vector<VkPhysicalDevice> m_devices;
+class VkDeviceUtils {
+public:
+    VkDeviceUtils() = delete;
+
+    static std::vector<VkPhysicalDevice> PhysicalDevices(VkInstance vkInstance);
+
+    static QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+};
+
+class VkDevicePicker {
+    public:
+        VkDevicePicker() = delete;
+    
+        static VkPhysicalDevice PickDevice(const std::vector<VkPhysicalDevice>& devices);
+    
+        static uint32_t RateDeviceSuitability(VkPhysicalDevice device);
 };
 
 } // namespace nex

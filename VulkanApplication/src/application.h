@@ -9,7 +9,6 @@
 
 #include "VkExtensions.h"
 #include "VkLayers.h"
-#include "VkDevicePicker.h"
 
 #define ENABLE_VALIDATION_LAYERS
 
@@ -29,6 +28,7 @@ private:
 
     void createVulkanInstance();
     void createVulkanDebugMessenger();
+    void createVulkanSurface();
     void pickVulkanPhysicalDevice();
     void createVulkanLogicalDevice();
 
@@ -60,10 +60,14 @@ private:
     GLFWwindow* m_window = nullptr;
 
     // Vulkan
-    VkInstance m_vkInstance;
-    VkDebugUtilsMessengerEXT m_vkDebugMessenger;
-    VkPhysicalDevice m_pickedVkPhysicalDevice;
-    VkDevice m_vkDevice;
+    VkInstance m_vkInstance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT m_vkDebugMessenger = VK_NULL_HANDLE;
+    VkPhysicalDevice m_pickedVkPhysicalDevice = VK_NULL_HANDLE;
+    VkDevice m_vkDevice = VK_NULL_HANDLE;
+    VkSurfaceKHR m_vkSurface = VK_NULL_HANDLE;
+    
+    VkQueue m_vkGraphicsQueue = VK_NULL_HANDLE;
+    VkQueue m_vkPresentQueue = VK_NULL_HANDLE;
 
     VkExtensions m_instanceExtensions = VkExtensions::InstanceExtensions();
     VkLayers m_instanceLayers = VkLayers::InstanceLayers();
