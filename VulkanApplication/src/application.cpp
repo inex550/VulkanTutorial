@@ -5,7 +5,10 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <limits>
+#include <algorithm>
 #include <vector>
+#include <array>
 #include <set>
 
 #include "VkDevices.h"
@@ -140,7 +143,7 @@ void Application::createVulkanInstance() {
 void Application::createVulkanDebugMessenger() {
     VkDebugUtilsMessengerCreateInfoEXT createInfo {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity =  VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+    createInfo.messageSeverity =  VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
                                 | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
                                 | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     createInfo.messageType =  VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
@@ -174,7 +177,30 @@ void Application::createVulkanSurface() {
 
 void Application::pickVulkanPhysicalDevice() {
     std::vector<VkPhysicalDevice> physicalDevices = VkDeviceUtils::PhysicalDevices(m_vkInstance);
-    m_pickedVkPhysicalDevice = VkDevicePicker::PickDevice(physicalDevices);
+
+    uint32_t maxDeviceSuitability = 0;
+    VkPhysicalDevice bestSuitableDevice = VK_NULL_HANDLE;
+
+    for (const auto& device : physicalDevices) {
+        VkExtensions deviceExtensions = VkExtensions::DeviceExtensions(device);
+        if (!deviceExtensions.extensionsAvailable(m_requiredDeviceExtensions.begin(), m_requiredDeviceExtensions.end())) {
+            continue;
+        }
+
+        DeviceSwapChainInfo deviceSwapChainInfo = VkDeviceUtils::GetDeviceSwapChainInfo(device, m_vkSurface);
+        if (deviceSwapChainInfo.formats.empty() || deviceSwapChainInfo.presentModes.empty()) {
+            continue;
+        }
+
+        uint32_t deviceSuitability = VkDeviceUtils::RateDeviceSuitability(device);
+        
+        if (deviceSuitability > maxDeviceSuitability) {
+            maxDeviceSuitability = deviceSuitability;
+            bestSuitableDevice = device;
+        }
+    }
+
+    m_pickedVkPhysicalDevice = bestSuitableDevice;
 
     if (m_pickedVkPhysicalDevice == VK_NULL_HANDLE) {
         throw std::runtime_error("Failed to find any suitable physical device");
@@ -182,7 +208,7 @@ void Application::pickVulkanPhysicalDevice() {
 }
 
 void Application::createVulkanLogicalDevice() {
-    QueueFamilyIndices deviceQueueFamilyIndices = VkDeviceUtils::FindQueueFamilies(m_pickedVkPhysicalDevice, m_vkSurface);
+    DeviceQueueFamilyIndices deviceQueueFamilyIndices = VkDeviceUtils::FindDeviceQueueFamilies(m_pickedVkPhysicalDevice, m_vkSurface);
 
     if (!deviceQueueFamilyIndices.isComplete()) {
         throw std::runtime_error("Failed to find necessary queue family");
@@ -191,14 +217,14 @@ void Application::createVulkanLogicalDevice() {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 
     std::set<uint32_t> uniqueQueueFamilyIndices { 
-        deviceQueueFamilyIndices.graphicsFamily, deviceQueueFamilyIndices.presentFamily };
+        deviceQueueFamilyIndices.graphicsFamily.value(), deviceQueueFamilyIndices.presentFamily.value() };
 
     for (uint32_t queueFamilyIdx : uniqueQueueFamilyIndices) {
         VkDeviceQueueCreateInfo queueCreateInfo {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = deviceQueueFamilyIndices.graphicsFamily.value();
         queueCreateInfo.queueCount = 1;
-        
+
         float queuePriority = 1.0;
         queueCreateInfo.pQueuePriorities = &queuePriority;
 
@@ -214,6 +240,9 @@ void Application::createVulkanLogicalDevice() {
 
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
+    deviceCreateInfo.ppEnabledExtensionNames = m_requiredDeviceExtensions.data();
+    deviceCreateInfo.enabledExtensionCount = m_requiredDeviceExtensions.size();
+
     deviceCreateInfo.ppEnabledLayerNames = m_requiredInstanceLayers.data();
     deviceCreateInfo.enabledLayerCount = m_requiredInstanceLayers.size();
 
@@ -225,11 +254,135 @@ void Application::createVulkanLogicalDevice() {
     vkGetDeviceQueue(m_vkDevice, deviceQueueFamilyIndices.presentFamily.value(), 0, &m_vkPresentQueue);
 }
 
+void Application::createSwapChain() {
+    DeviceSwapChainInfo swapChainInfo = VkDeviceUtils::GetDeviceSwapChainInfo(m_pickedVkPhysicalDevice, m_vkSurface);
+
+    VkSurfaceFormatKHR choosedSurfaceFormat = chooseSurfaceFormat(swapChainInfo.formats);
+    VkPresentModeKHR choosedPresentMode = choosePresentMode(swapChainInfo.presentModes);
+    VkExtent2D choosedSwapchainExtent = chooseSwapExtent(swapChainInfo.capabilities);
+
+    uint32_t imageCount = swapChainInfo.capabilities.minImageCount + 1;
+    if (swapChainInfo.capabilities.maxImageCount > 0 && imageCount <= swapChainInfo.capabilities.maxImageCount) {
+        imageCount = swapChainInfo.capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR swapChainCreateInfo {};
+    swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapChainCreateInfo.minImageCount = imageCount;
+    swapChainCreateInfo.imageFormat = choosedSurfaceFormat.format;
+    swapChainCreateInfo.imageColorSpace = choosedSurfaceFormat.colorSpace;
+    swapChainCreateInfo.presentMode = choosedPresentMode;
+    swapChainCreateInfo.imageExtent = choosedSwapchainExtent;
+    swapChainCreateInfo.imageArrayLayers = 1;
+    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    DeviceQueueFamilyIndices queueFamilyIndices = VkDeviceUtils::FindDeviceQueueFamilies(m_pickedVkPhysicalDevice, m_vkSurface);
+
+    std::array<uint32_t, 2> indices { queueFamilyIndices.graphicsFamily.value(), queueFamilyIndices.presentFamily.value() };
+
+    if (queueFamilyIndices.graphicsFamily != queueFamilyIndices.presentFamily) {
+        swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapChainCreateInfo.queueFamilyIndexCount = indices.size();
+        swapChainCreateInfo.pQueueFamilyIndices = indices.data();
+    } else {
+        swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapChainCreateInfo.queueFamilyIndexCount = 0;
+        swapChainCreateInfo.pQueueFamilyIndices = nullptr;
+    }
+
+    swapChainCreateInfo.preTransform = swapChainInfo.capabilities.currentTransform;
+    swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapChainCreateInfo.clipped = VK_TRUE;
+    swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    if (VkResult result = vkCreateSwapchainKHR(m_vkDevice, &swapChainCreateInfo, nullptr, &m_vkSwapchain); result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create vulkan swapchain");
+    }
+
+    uint32_t swapchainImageCount = 0;
+    vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &swapchainImageCount, nullptr);
+    m_swapchainImages.resize(swapchainImageCount);
+    vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapchain, &swapchainImageCount, m_swapchainImages.data());
+
+    m_swapchainImageFormat = choosedSurfaceFormat;
+    m_swapchainImageExtent = choosedSwapchainExtent;
+}
+
+void Application::createImageViews() {
+    m_swapchainImageViews.resize(m_swapchainImages.size());
+
+    for (size_t i = 0; i < m_swapchainImageViews.size(); ++i) {
+        VkImageViewCreateInfo imageViewCreateInfo {};
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewCreateInfo.image = m_swapchainImages[i];
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+        imageViewCreateInfo.components.r = VkComponentSwizzle::VK_COMPONENT_SWIZZLE_IDENTITY;
+        imageViewCreateInfo.components.g = VkComponentSwizzle::VK_COMPONENT_SWIZZLE_IDENTITY;
+        imageViewCreateInfo.components.b = VkComponentSwizzle::VK_COMPONENT_SWIZZLE_IDENTITY;
+        imageViewCreateInfo.components.a = VkComponentSwizzle::VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        imageViewCreateInfo.subresourceRange.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        imageViewCreateInfo.subresourceRange.levelCount = 1;
+        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+        if (VkResult result = vkCreateImageView(m_vkDevice, &imageViewCreateInfo, nullptr, &m_swapchainImageViews[i]); result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create vulkan image view");
+        }
+    }
+}
+
+VkSurfaceFormatKHR Application::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+    for (auto surfaceFormat : availableFormats) {
+        if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            return surfaceFormat;
+        }
+    }
+    return availableFormats[0];
+}
+
+VkPresentModeKHR Application::choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+    for (auto presentMode : availablePresentModes) {
+        if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            return presentMode;
+        }
+    }
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D Application::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return capabilities.currentExtent;
+    }
+
+    int windowWidth = 0;
+    int windowHeight = 0;
+    glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
+
+    VkExtent2D extent {
+        .width = static_cast<uint32_t>(windowWidth),
+        .height = static_cast<uint32_t>(windowHeight)
+    };
+
+    extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+    extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+    return extent;
+}
+
 void Application::cleanup() {
     if (!m_init) {
         return;
     }
 
+    for (auto& imageView : m_swapchainImageViews) {
+        vkDestroyImageView(m_vkDevice, imageView, nullptr);
+    }
+    m_swapchainImageViews.clear();
+
+    vkDestroySwapchainKHR(m_vkDevice, m_vkSwapchain, nullptr);
     vkDestroyDevice(m_vkDevice, nullptr);
     vkDestroySurfaceKHR(m_vkInstance, m_vkSurface, nullptr);    
     destroyVulkanDebugMessenger();

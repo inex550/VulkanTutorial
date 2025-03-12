@@ -13,6 +13,7 @@ public:
     VkExtensions() = default;
 
     static VkExtensions InstanceExtensions();
+    static VkExtensions DeviceExtensions(VkPhysicalDevice device);
 
     bool extensionAvailable(const std::string_view& extensionName);
 

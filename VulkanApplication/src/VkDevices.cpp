@@ -6,14 +6,14 @@ std::vector<VkPhysicalDevice> VkDeviceUtils::PhysicalDevices(VkInstance vkInstan
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
     
-    std::vector<VkPhysicalDevice> devices;
+    std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, devices.data());
 
     return devices;
 }
 
-QueueFamilyIndices VkDeviceUtils::FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
-    QueueFamilyIndices queueFamilyIndices;
+DeviceQueueFamilyIndices VkDeviceUtils::FindDeviceQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
+    DeviceQueueFamilyIndices queueFamilyIndices;
 
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -43,23 +43,27 @@ QueueFamilyIndices VkDeviceUtils::FindQueueFamilies(VkPhysicalDevice device, VkS
     return queueFamilyIndices;
 }
 
-VkPhysicalDevice VkDevicePicker::PickDevice(const std::vector<VkPhysicalDevice>& devices) {
-    uint32_t maxDeviceSuitability = 0;
-    VkPhysicalDevice suitableDevice = VK_NULL_HANDLE;
+DeviceSwapChainInfo VkDeviceUtils::GetDeviceSwapChainInfo(VkPhysicalDevice device, VkSurfaceKHR surface) {
+    DeviceSwapChainInfo swapChainInfo;
 
-    for (const auto& device : devices) {
-        uint32_t deviceSuitability = RateDeviceSuitability(device);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &swapChainInfo.capabilities);
 
-        if (deviceSuitability > maxDeviceSuitability) {
-            maxDeviceSuitability = deviceSuitability;
-            suitableDevice = device;
-        }
-    }
-
-    return suitableDevice;
-}
+    uint32_t formatsCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatsCount, nullptr);
     
-uint32_t VkDevicePicker::RateDeviceSuitability(VkPhysicalDevice device) {
+    swapChainInfo.formats.resize(formatsCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatsCount, swapChainInfo.formats.data());
+
+    uint32_t presentModesCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModesCount, nullptr);
+    
+    swapChainInfo.presentModes.resize(presentModesCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModesCount, swapChainInfo.presentModes.data());
+
+    return swapChainInfo;
+}
+
+uint32_t VkDeviceUtils::RateDeviceSuitability(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
 

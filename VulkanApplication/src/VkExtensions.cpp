@@ -14,6 +14,18 @@ VkExtensions VkExtensions::InstanceExtensions() {
     return extensions;
 }
 
+VkExtensions VkExtensions::DeviceExtensions(VkPhysicalDevice device) {
+    VkExtensions extensions;
+
+    uint32_t extensionsCount = 0;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, nullptr);
+    
+    extensions.m_extensions.resize(extensionsCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, extensions.m_extensions.data());
+
+    return extensions;
+}
+
 bool VkExtensions::extensionAvailable(const std::string_view& extensionName) {
     for (auto extension : m_extensions) {
         if (extensionName == extension.extensionName) {

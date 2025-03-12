@@ -31,6 +31,12 @@ private:
     void createVulkanSurface();
     void pickVulkanPhysicalDevice();
     void createVulkanLogicalDevice();
+    void createSwapChain();
+    void createImageViews();
+
+    VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
     void cleanup();
     void destroyVulkanDebugMessenger();
@@ -56,6 +62,10 @@ private:
         #endif
     };
 
+    std::vector<const char*> m_requiredDeviceExtensions {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
     // GLFW
     GLFWwindow* m_window = nullptr;
 
@@ -65,6 +75,12 @@ private:
     VkPhysicalDevice m_pickedVkPhysicalDevice = VK_NULL_HANDLE;
     VkDevice m_vkDevice = VK_NULL_HANDLE;
     VkSurfaceKHR m_vkSurface = VK_NULL_HANDLE;
+
+    VkSwapchainKHR m_vkSwapchain = VK_NULL_HANDLE;
+    VkSurfaceFormatKHR m_swapchainImageFormat {};
+    VkExtent2D m_swapchainImageExtent {};
+    std::vector<VkImage> m_swapchainImages;
+    std::vector<VkImageView> m_swapchainImageViews;
     
     VkQueue m_vkGraphicsQueue = VK_NULL_HANDLE;
     VkQueue m_vkPresentQueue = VK_NULL_HANDLE;
