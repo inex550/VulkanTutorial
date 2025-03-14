@@ -334,6 +334,10 @@ void Application::createImageViews() {
     }
 }
 
+void Application::createGraphicsPipeline() {
+
+}
+
 VkSurfaceFormatKHR Application::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     for (auto surfaceFormat : availableFormats) {
         if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
