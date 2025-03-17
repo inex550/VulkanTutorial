@@ -35,6 +35,8 @@ private:
     void createImageViews();
     void createGraphicsPipeline();
 
+    VkShaderModule createShaderModule(const std::vector<char>& shaderCode);
+
     VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
     VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);

@@ -12,9 +12,13 @@
 #include <set>
 
 #include "VkDevices.h"
+#include "Utils.h"
 
 #define GLFW_EXPOSE_NATIVE_WAYLAND
 #include <GLFW/glfw3native.h>
+
+#define SHADER_VERT_CODE_FILE "assets/triangle.vert.spv"
+#define SHADER_FRAG_CODE_FILE "assets/triangle.frag.spv"
 
 namespace nex {
 
@@ -106,6 +110,7 @@ void Application::initVulkan() {
     createVulkanSurface();
     pickVulkanPhysicalDevice();
     createVulkanLogicalDevice();
+    createGraphicsPipeline();
 }
 
 void Application::createVulkanInstance() {
@@ -335,7 +340,39 @@ void Application::createImageViews() {
 }
 
 void Application::createGraphicsPipeline() {
+    auto shaderVertCode = utils::ReadFile(SHADER_VERT_CODE_FILE);
+    auto shaderFragCode = utils::ReadFile(SHADER_FRAG_CODE_FILE);
 
+    auto shaderVertModule = createShaderModule(shaderVertCode);
+    auto shaderFragModule = createShaderModule(shaderFragCode);
+
+    VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo {};
+    vertShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageCreateInfo.stage = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageCreateInfo.pName = "main";
+    vertShaderStageCreateInfo.module = shaderVertModule;
+
+    VkPipelineShaderStageCreateInfo fragShaderStageCreateInfo {};
+    vertShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageCreateInfo.stage = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+    vertShaderStageCreateInfo.pName = "main";
+    vertShaderStageCreateInfo.module = shaderFragModule;
+
+    VkPipelineShaderStageCreateInfo shaderStageCreateInfos[] = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
+}
+
+VkShaderModule Application::createShaderModule(const std::vector<char>& shaderCode) {
+    VkShaderModuleCreateInfo shaderModuleCreateInfo {};
+    shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shaderModuleCreateInfo.codeSize = shaderCode.size();
+    shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+    if (VkResult result = vkCreateShaderModule(m_vkDevice, &shaderModuleCreateInfo, nullptr, &shaderModule); result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create VkShaderModule");
+    }
+
+    return shaderModule;
 }
 
 VkSurfaceFormatKHR Application::chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
