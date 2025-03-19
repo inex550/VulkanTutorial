@@ -88,6 +88,8 @@ private:
     VkQueue m_vkGraphicsQueue = VK_NULL_HANDLE;
     VkQueue m_vkPresentQueue = VK_NULL_HANDLE;
 
+    VkPipelineLayout m_vkPipelineLayout = VK_NULL_HANDLE;
+
     VkExtensions m_instanceExtensions = VkExtensions::InstanceExtensions();
     VkLayers m_instanceLayers = VkLayers::InstanceLayers();
 };

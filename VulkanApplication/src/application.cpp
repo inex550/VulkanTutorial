@@ -359,6 +359,83 @@ void Application::createGraphicsPipeline() {
     vertShaderStageCreateInfo.module = shaderFragModule;
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfos[] = { vertShaderStageCreateInfo, fragShaderStageCreateInfo };
+
+    std::array<VkDynamicState, 2> dynamicStates = {
+        VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT,
+        VkDynamicState::VK_DYNAMIC_STATE_SCISSOR,
+    };
+
+    VkPipelineDynamicStateCreateInfo pipelineStateCreateInfo {};
+    pipelineStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    pipelineStateCreateInfo.dynamicStateCount = dynamicStates.size();
+    pipelineStateCreateInfo.pDynamicStates = dynamicStates.data();
+
+    VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyCreateInfo;
+    pipelineInputAssemblyCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    pipelineInputAssemblyCreateInfo.topology = VkPrimitiveTopology::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    pipelineInputAssemblyCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(m_swapchainImageExtent.width);
+    viewport.height = static_cast<float>(m_swapchainImageExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor {};
+    scissor.offset = { 0, 0 };
+    scissor.extent = m_swapchainImageExtent;
+
+    VkPipelineViewportStateCreateInfo pipelineViewportCreateInfo {};
+    pipelineViewportCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    pipelineViewportCreateInfo.viewportCount = 1;
+    pipelineViewportCreateInfo.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo {};
+    pipelineRasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    pipelineRasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
+    pipelineRasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
+    pipelineRasterizationStateCreateInfo.polygonMode = VkPolygonMode::VK_POLYGON_MODE_FILL;
+    pipelineRasterizationStateCreateInfo.lineWidth = 1.0f;
+    pipelineRasterizationStateCreateInfo.cullMode = VkCullModeFlagBits::VK_CULL_MODE_BACK_BIT;
+    pipelineRasterizationStateCreateInfo.frontFace = VkFrontFace::VK_FRONT_FACE_CLOCKWISE;
+    pipelineRasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
+    pipelineRasterizationStateCreateInfo.depthBiasClamp = 0.0f;
+    pipelineRasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
+    pipelineRasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+
+    VkPipelineMultisampleStateCreateInfo pipelineMultisableStateCreateInfo {};
+    pipelineMultisableStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    pipelineMultisableStateCreateInfo.sampleShadingEnable = VK_FALSE;
+    pipelineMultisableStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    pipelineMultisableStateCreateInfo.minSampleShading = 1.0f;
+    pipelineMultisableStateCreateInfo.pSampleMask = nullptr;
+    pipelineMultisableStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
+    pipelineMultisableStateCreateInfo.alphaToOneEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState pipelineColorBlendAttachment {};
+    pipelineColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    pipelineColorBlendAttachment.blendEnable = VK_FALSE;
+    pipelineColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    pipelineColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    pipelineColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    pipelineColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    pipelineColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    pipelineColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo {};
+    pipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    pipelineColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
+    pipelineColorBlendStateCreateInfo.attachmentCount = 1;
+    pipelineColorBlendStateCreateInfo.pAttachments = &pipelineColorBlendAttachment;
+
+    VkPipelineLayoutCreateInfo pipelieLayoutCreateInfo {};
+    pipelieLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+    if (VkResult result = vkCreatePipelineLayout(m_vkDevice, &pipelieLayoutCreateInfo, nullptr, &m_vkPipelineLayout); result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create VkPipelineLayout");
+    }
 }
 
 VkShaderModule Application::createShaderModule(const std::vector<char>& shaderCode) {
