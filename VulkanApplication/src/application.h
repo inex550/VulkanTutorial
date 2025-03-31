@@ -33,6 +33,7 @@ private:
     void createVulkanLogicalDevice();
     void createSwapChain();
     void createImageViews();
+    void createRenderPass();
     void createGraphicsPipeline();
 
     VkShaderModule createShaderModule(const std::vector<char>& shaderCode);
@@ -87,7 +88,9 @@ private:
     
     VkQueue m_vkGraphicsQueue = VK_NULL_HANDLE;
     VkQueue m_vkPresentQueue = VK_NULL_HANDLE;
+    VkPipeline m_vkPipeline = VK_NULL_HANDLE;
 
+    VkRenderPass m_vkRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout m_vkPipelineLayout = VK_NULL_HANDLE;
 
     VkExtensions m_instanceExtensions = VkExtensions::InstanceExtensions();
